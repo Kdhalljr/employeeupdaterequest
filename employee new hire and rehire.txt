@@ -1,0 +1,107 @@
+/*
+  After adding script to project, click edit, current project triggers, add a trigger, from the dropdowns: select 
+    the function you want to run
+    "From form"
+    "On form submit"
+    Set error notifications to be sent immediately
+  The selected script will run every time your form has been submitted
+*/
+
+function getRespondentListSSId() {
+  return "XXXXXX";
+}
+
+function getRespondentEmails() {
+  var SHEETNAME = "Respondents";
+  var FIRSTDATAROWNUM = 2;
+  var LISTCOLNUM = 1;
+  var ONLYELEMENTINDEX = 0;
+  
+  var ss = SpreadsheetApp.openById(getRespondentListSSId());
+  var ssSheet = ss.getSheetByName(SHEETNAME);
+  var ssRange = ssSheet.getRange(FIRSTDATAROWNUM, LISTCOLNUM, (ssSheet.getLastRow()-1));
+  var ssValues = ssRange.getValues();
+  var emailList = [];
+  
+  for (var i = 0; i < ssValues.length; i++) {
+    emailList.push(ssValues[i][ONLYELEMENTINDEX]);
+  }
+    
+  return emailList;
+}
+
+
+
+function getCurrentDay() {
+  return Number(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd"));
+}
+
+
+
+function getDay(time) {
+  return Number(Utilities.formatDate(new Date(time), Session.getScriptTimeZone(), "dd"));
+}
+
+
+
+function getResponseNum() {
+  var responseNum = 0;
+  var formResponses = FormApp.getActiveForm().getResponses();
+  
+  for (var i = formResponses.length-1; i >= 0; i--) {
+    var formResponse = formResponses[i];
+    var itemResponses = formResponse.getItemResponses();
+    if (getDay(formResponse.getTimestamp()) == getCurrentDay()) {
+      responseNum++;
+    }
+    else {
+      return responseNum.toString();
+    }   
+  }
+}
+
+
+
+function onSubmit(e) {
+  var STATUSITEMRESPONSENUM = 0;
+  var LASTNAMEITEMRESPONSENUM = 1;
+  var FIRSTNAMEITEMRESPONSENUM = 2;
+  var STORENUMITEMRESPONSENUM = 3;
+  var POSITIONTYPEITEMRESPONSENUM = 4;
+  var DATEOFHIREITEMRESPONSENUM = 5;
+  var LOGINIDITEMRESPONSENUM = 6;
+  var CUSTOMERPROFILEITEMRESPONSENUM = 7;
+  
+  var formResponse = e.response;
+  var itemResponses = formResponse.getItemResponses();
+  
+  var formattedDate = Utilities.formatDate(formResponse.getTimestamp(), "PST", "MM/dd/yyyy");
+  
+  var email = getRespondentEmails();
+  
+  var subject = itemResponses[STORENUMITEMRESPONSENUM].getResponse() + " " + itemResponses[FIRSTNAMEITEMRESPONSENUM].getResponse().toString() + " " + itemResponses[LASTNAMEITEMRESPONSENUM].getResponse().toString() + " CTC Employee " + itemResponses[STATUSITEMRESPONSENUM].getResponse() + " #" + getResponseNum() + " " + formattedDate;
+  
+  var message = "";
+  
+  for (var i = 0; i < itemResponses.length; i++) {
+    if (itemResponses[i].getItem().getTitle() != "Customer Profile") {
+      if (itemResponses[i].getResponse().toString() != "") {
+        if (itemResponses[i].getItem().getTitle()  == "Date of Hire or Re-Hire") {
+          var date = itemResponses[i].getResponse().split("-");
+          message += itemResponses[i].getItem().getTitle() + ": " + date[1] + "/" + date[2] + "/" + date[0] + "\n\n";
+        }
+        else {
+          message += itemResponses[i].getItem().getTitle() + ": " + itemResponses[i].getResponse().toString() + "\n\n";
+        }
+      }
+    }
+    else {
+      var customerProfileArray = itemResponses[i].getResponse();
+      for (var j = 0; j < customerProfileArray.length; j++) {
+        message += customerProfileArray[j].toString() + "\n\n";
+      }
+    }
+  }
+
+  MailApp.sendEmail(email, subject, message)
+}
